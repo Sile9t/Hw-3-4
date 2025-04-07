@@ -13,7 +13,8 @@ $action = $_GET["action"] ?? 'default';
 $formActionText = 'create';
 $formSubmitText = 'Создать';
 
-$message = $messages[$_GET["message"] ?? 'default'] ?? '';
+$messageKey = $_GET["message"] ?? null;
+$message = $messages[$messageKey ?? 'default'] ?? '';
 
 $error = $_GET["error"] ?? false;
 
@@ -54,7 +55,7 @@ if ($action == 'register' && $method == 'POST') {
         $_SESSION['errors']['password'] = 'Введите пароль для регистрации';
     }
 
-    if ($_SESSION['errors']) {
+    if (isset($_SESSION['errors'])) {
         $_SESSION['old']['nickname'] = $nickname;
         $_SESSION['old']['email'] = $email;
 
@@ -88,7 +89,7 @@ if ($action == 'login' && $method == 'POST') {
         $_SESSION['errors']['password'] = 'Введите пароль для входа';
     }
 
-    if ($_SESSION['errors']) {
+    if (isset($_SESSION['errors'])) {
         $_SESSION['old']['email'] = $email;
 
         header('Location: /');
@@ -119,18 +120,38 @@ if ($action == 'logout' && $method == 'GET') {
     exit;
 }
 
+if (isset($_SESSION['nickname'])) {}
+
 //CRUD -> Update
 if ($action == 'update') {
-    $id = (int)$_GET["id"] ?? 0;
+    $id = (int)$_GET["id"];
+
+    // если id нету
+    if (!$id){
+        header('Location: /?error=true&message=id');
+        exit();
+    }
+
     $statement = $db->prepare("SELECT * from posts where id = ?");
     $statement->execute([$id]);
     $post = $statement->fetch(PDO::FETCH_ASSOC);
+
+    // если пост не найден
+    if (!$post) {
+        header('Location: /?error=true&message=postNotFound');
+        exit();
+    }
+
     $formActionText = 'save';
     $formSubmitText = 'Изменить';
 }
 if ($action == 'save') {
     $id = (int)$_POST["id"] ?? 0;
     $title = $_POST['title'] ?? '';
+    if ($title == '') {
+        header('Location: /?action=update&id=' . $id . '&error=true&message=title');
+        exit();
+    }
     $content = $_POST['content'] ?? '';
 
 
@@ -144,7 +165,22 @@ if ($action == 'save') {
 if ($action == 'delete') {
     $id = (int)$_GET["id"] ?? 0;
 
-    //??валидация!!
+    //валидация
+    if (!$id) {
+        header('Location: /?error=true&message=id');
+        exit();
+    }
+
+    $statement = $db->prepare("SELECT * from posts where id = ?");
+    $statement->execute([$id]);
+    
+    $post = $statement->fetch(PDO::FETCH_ASSOC);
+
+    // если пост не найден
+    if (!$post) {
+        header('Location: /?error=true&message=postNotFound');
+        exit();
+    }
 
     $statement = $db->prepare("DELETE FROM posts WHERE id = :id");
     $statement->execute([$id]);
@@ -200,7 +236,7 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
             <h1>Create Post</h1>
         <?php endif; ?>
 
-        <?php if ($_SESSION['messages']): ?>
+        <?php if (isset($_SESSION['messages'])): ?>
             <?php foreach ($_SESSION['messages'] as $message): ?>
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     <p><?= $message ?></p>
@@ -209,7 +245,7 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
             <?php endforeach; ?>
         <?php endif; ?>
 
-        <?php if ($_SESSION['errors']): ?>
+        <?php if (isset($_SESSION['errors'])): ?>
             <?php foreach ($_SESSION['errors'] as $error): ?>
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     <p><?= $error ?></p>
@@ -226,9 +262,9 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Nickname -->
                 <div class="mb-3">
                     <label for="nickname" class="form-label">Nickname</label>
-                    <input type="text" class="form-control <?php if ($_SESSION['errors']['nickname']): ?>is-invalid<?php endif; ?>" id="nickname" name="nickname" value="<?= $_SESSION['old']['nickname'] ?? '' ?>">
+                    <input type="text" class="form-control <?php if (isset($_SESSION['errors']['nickname'])): ?>is-invalid<?php endif; ?>" id="nickname" name="nickname" value="<?= $_SESSION['old']['nickname'] ?? '' ?>">
 
-                    <?php if ($_SESSION['errors']['nickname']): ?>
+                    <?php if (isset($_SESSION['errors']['nickname'])): ?>
                         <div class="invalid-feedback">
                             Введите никнейм
                         </div>
@@ -238,9 +274,9 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Email -->
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control <?php if ($_SESSION['errors']['email']): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? '' ?>" autocomplete="off">
+                    <input type="email" class="form-control <?php if (isset($_SESSION['errors']['email'])): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? '' ?>" autocomplete="off">
 
-                    <?php if ($_SESSION['errors']['email']): ?>
+                    <?php if (isset($_SESSION['errors']['email'])): ?>
                         <div class="invalid-feedback">
                             Введите email
                         </div>
@@ -250,9 +286,9 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Password -->
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control <?php if ($_SESSION['errors']['password']): ?>is-invalid<?php endif; ?>" id="password" name="password">
+                    <input type="password" class="form-control <?php if (isset($_SESSION['errors']['password'])): ?>is-invalid<?php endif; ?>" id="password" name="password">
 
-                    <?php if ($_SESSION['errors']['password']): ?>
+                    <?php if (isset($_SESSION['errors']['password'])): ?>
                         <div class="invalid-feedback">
                             Введите пароль
                         </div>
@@ -270,9 +306,9 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Email -->
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control <?php if ($_SESSION['errors']['email']): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? '' ?>">
+                    <input type="email" class="form-control <?php if (isset($_SESSION['errors']['email'])): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? '' ?>">
 
-                    <?php if ($_SESSION['errors']['email']): ?>
+                    <?php if (isset($_SESSION['errors']['email'])): ?>
                         <div class="invalid-feedback">
                             Введите email
                         </div>
@@ -282,9 +318,9 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Password -->
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control <?php if ($_SESSION['errors']['password']): ?>is-invalid<?php endif; ?>" id="password" name="password">
+                    <input type="password" class="form-control <?php if (isset($_SESSION['errors']['password'])): ?>is-invalid<?php endif; ?>" id="password" name="password">
 
-                    <?php if ($_SESSION['errors']['password']): ?>
+                    <?php if (isset($_SESSION['errors']['password'])): ?>
                         <div class="invalid-feedback">
                             Введите пароль
                         </div>
@@ -308,13 +344,13 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
             <!-- Поле Title -->
             <div class="mb-3">
                 <label for="title" class="form-label">Title</label>
-                <input type="text" class="form-control  <?php if ($error): ?>is-invalid<?php endif; ?>" id="title"
+                <input type="text" class="form-control  <?php if ($error && $messageKey == 'title'): ?>is-invalid<?php endif; ?>" id="title"
                     name="title"
-                    value="<?= $post['title'] ?? '' ?>">
+                    value="<?=$post['title'] ?? ''?>">
 
-                <?php if ($error): ?>
+                <?php if ($error && $messageKey == 'title'): ?>
                     <div class="invalid-feedback">
-                        <?= $message ?>
+                        <?=$message?>
                     </div>
                 <?php endif; ?>
 
@@ -323,12 +359,12 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
             <!-- Поле Content -->
             <div class="mb-3">
                 <label for="content" class="form-label">Content</label>
-                <textarea class="form-control <?php if ($error): ?>is-invalid<?php endif; ?>" id="content" name="content"
-                    rows="5"><?= $post['content'] ?? '' ?></textarea>
+                <textarea class="form-control <?php if ($error && $messageKey == 'content'): ?>is-invalid<?php endif; ?>" id="content" name="content"
+                        rows="5"><?=$post['content'] ?? ''?></textarea>
 
-                <?php if ($error): ?>
+                <?php if ($error && $messageKey == 'content'): ?>
                     <div class="invalid-feedback">
-                        ggg
+                        <?=$message?>
                     </div>
                 <?php endif; ?>
 
@@ -349,8 +385,10 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <div class="card-header"><?= htmlspecialchars($post['title']) ?></div>
                 <div class="card-body">
                     <p><?= htmlspecialchars($post['content']) ?></p>
+                    <?php if (isset($_SESSION['nickname'])): ?>
                     <a style="width: 150px" href="/?action=update&id=<?= $post['id'] ?>" class="btn btn-warning">Изменить</a>
                     <a style="width: 150px" href="/?action=delete&id=<?= $post['id'] ?>" class="btn btn-danger">Удалить</a>
+                    <?php endif; ?>
                 </div>
             </div><br>
         <?php endforeach; ?>
