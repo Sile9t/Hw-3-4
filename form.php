@@ -6,6 +6,7 @@ $messages = [
     'update' => 'Пост изменен',
     'delete' => 'Пост удален',
     'title' => 'Заголовок не может быть пустой',
+    'login' => 'Вы не вошли в аккаунт'
 ];
 
 $success = $_GET["success"] ?? false;
@@ -36,6 +37,7 @@ $statement = $db->query('CREATE TABLE IF NOT EXISTS `users` (
 $method = $_SERVER['REQUEST_METHOD'];
 
 session_start();
+
 
 // Register
 if ($action == 'register' && $method == 'POST') {
@@ -76,6 +78,29 @@ if ($action == 'register' && $method == 'POST') {
     exit;
 }
 
+// Autologin
+if (isset($_COOKIE['autologin'])) {
+    $email = $_COOKIE['autologin']['email'];
+    $password = $_COOKIE['autologin']['password'];
+
+    $statement = $db->prepare("SELECT nickname, password FROM users WHERE email=?");
+    $statement->execute([$email]);
+    $user = $statement->fetch(PDO::FETCH_ASSOC);
+
+    if (password_verify($password, $user['password'])) {
+        $_SESSION['nickname'] = $user['nickname'];
+        $_SESSION['messages'][] = 'Вы успешно вошли';
+    } else {
+        unset($_COOKIE['autologin']);
+        $_SESSION['errors'][] = 'Не удалось войти (неверный логин или пароль)';
+    }
+
+    unset($_SESSION['old']);
+
+    header('Location: /');
+    exit;
+}
+
 // Login
 if ($action == 'login' && $method == 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -94,6 +119,11 @@ if ($action == 'login' && $method == 'POST') {
 
         header('Location: /');
         exit;
+    }
+    
+    if (isset($_POST['autologin'])) {
+        $_COOKIE['autologin']['email'] = $email;
+        $_COOKIE['autologin']['password'] = $password;
     }
 
     $statement = $db->prepare("SELECT nickname, password FROM users WHERE email=?");
@@ -116,14 +146,19 @@ if ($action == 'login' && $method == 'POST') {
 // Logout
 if ($action == 'logout' && $method == 'GET') {
     session_destroy();
+    unset($_COOKIE['autologin']);
     header('Location: /');
     exit;
 }
 
-if (isset($_SESSION['nickname'])) {}
-
 //CRUD -> Update
 if ($action == 'update') {
+    if (!isset($_SESSION['nickname'])) {
+        $_SESSION['errors'][] = 'Чтобы редактировать пост надо войти в аккаунт';
+        header('Location: /?error=true&message=login');
+        exit();
+    }
+
     $id = (int)$_GET["id"];
 
     // если id нету
@@ -146,6 +181,12 @@ if ($action == 'update') {
     $formSubmitText = 'Изменить';
 }
 if ($action == 'save') {
+    if (!isset($_SESSION['nickname'])) {
+        $_SESSION['errors'][] = 'Чтобы сохранить отредактированный пост надо войти в аккаунт';
+        header('Location: /?error=true&message=login');
+        exit();
+    }
+
     $id = (int)$_POST["id"] ?? 0;
     $title = $_POST['title'] ?? '';
     if ($title == '') {
@@ -163,6 +204,12 @@ if ($action == 'save') {
 
 //CRUD -> Delete
 if ($action == 'delete') {
+    if (!isset($_SESSION['nickname'])) {
+        $_SESSION['errors'][] = 'Чтобы удалить пост надо войти в аккаунт';
+        header('Location: /?error=true&message=login');
+        exit();
+    }
+
     $id = (int)$_GET["id"] ?? 0;
 
     //валидация
@@ -306,7 +353,7 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Email -->
                 <div class="mb-3">
                     <label for="email" class="form-label">Email</label>
-                    <input type="email" class="form-control <?php if (isset($_SESSION['errors']['email'])): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? '' ?>">
+                    <input type="email" class="form-control <?php if (isset($_SESSION['errors']['email'])): ?>is-invalid<?php endif; ?>" id="email" name="email" value="<?= $_SESSION['old']['email'] ?? $_COOKIE['email'] ?? '' ?>">
 
                     <?php if (isset($_SESSION['errors']['email'])): ?>
                         <div class="invalid-feedback">
@@ -318,7 +365,7 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                 <!-- Поле Password -->
                 <div class="mb-3">
                     <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control <?php if (isset($_SESSION['errors']['password'])): ?>is-invalid<?php endif; ?>" id="password" name="password">
+                    <input type="password" class="form-control <?php if (isset($_SESSION['errors']['password'])): ?>is-invalid<?php endif; ?>" id="password" name="password" value="<?php $password ?? '' ?>">
 
                     <?php if (isset($_SESSION['errors']['password'])): ?>
                         <div class="invalid-feedback">
@@ -327,6 +374,10 @@ $posts = $statement->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                 </div>
 
+                <div class="mb-3 d-flex gap-2">
+                    <input type="checkbox" name="autologin" id="autologin">
+                    Remember me
+                </div>
                 <!-- Кнопка отправки формы -->
                 <button type="submit" class="btn btn-primary">Войти</button>
             </form>
