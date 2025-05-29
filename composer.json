@@ -1,0 +1,21 @@
+{
+    "name": "sile9t/hw_3_4_2",
+    "autoload": {
+        "files": [
+            "core/render.php",
+            "core/functions.php",
+            "models/posts.php",
+            "models/about.php",
+            "core/controller.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "Sile9t",
+            "email": "eyesless1jack@gmail.com"
+        }
+    ],
+    "require": {
+        "symfony/var-dumper": "^6.4"
+    }
+}
